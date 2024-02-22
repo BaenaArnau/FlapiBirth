@@ -7,6 +7,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 
 public class Pipe extends Actor {
+    public static final float PIPE_HEIGHT = 230;
     Rectangle bounds;
     boolean upsideDown;
     AssetManager manager;
