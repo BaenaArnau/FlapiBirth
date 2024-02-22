@@ -99,13 +99,15 @@ public class GameScreen implements Screen {
                 obstacles.removeValue(pipe, true);
             }
         }
-        // Manejar la recolección del power-up
+        // Dentro del bucle while que maneja la recolección del power-up en el método render de GameScreen
         Iterator<PowerUp> powerUpIterator = powerUps.iterator();
         while (powerUpIterator.hasNext()) {
             PowerUp powerUp = powerUpIterator.next();
             if (powerUp.getBounds().overlaps(player.getBounds())) {
                 powerUp.collect(); // Marcar el power-up como recogido
                 activateInvulnerability(); // Activar la invulnerabilidad
+                player.setHasPowerUp(true); // Establecer que el jugador tiene un power-up activo
+                player.setPowerUpTexture(game.manager.get("powerupbird.png", Texture.class)); // Cambiar la textura del jugador
             }
         }
         // Actualizar el temporizador de invulnerabilidad
@@ -129,6 +131,7 @@ public class GameScreen implements Screen {
             if (invulnerabilityTimer >= invulnerabilityDuration) {
                 invulnerable = false; // Desactivar la invulnerabilidad al pasar el tiempo
                 invulnerabilityTimer = 0; // Reiniciar el temporizador
+                player.deactivatePowerUp(game.manager); // Desactivar el power-up cuando se agote el tiempo
             }
         }
     }
@@ -213,8 +216,6 @@ public class GameScreen implements Screen {
         stage.addActor(powerUp);
         lastPowerUpTime = TimeUtils.nanoTime();
     }
-
-
 
     private void activateInvulnerability() {
         invulnerable = true;
