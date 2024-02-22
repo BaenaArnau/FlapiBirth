@@ -60,6 +60,11 @@ public class Player extends Actor {
         this.hasPowerUp = hasPowerUp;
     }
 
+    // Método para obtener si el jugador tiene un power-up activo
+    public boolean hasPowerUp() {
+        return hasPowerUp;
+    }
+
     // Método para establecer el AssetManager
     public void setManager(AssetManager manager) {
         this.manager = manager;

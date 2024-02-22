@@ -31,6 +31,8 @@ public class GameScreen implements Screen {
     private float invulnerabilityDuration; // Duración de la invulnerabilidad en segundos
     private float invulnerabilityTimer; // Temporizador para la invulnerabilidad
     private SpriteBatch batch;
+    private float normalPowerUpSpawnRate;
+    private float normalScoreIncrementRate;
 
     public GameScreen(final Bird gam) {
         this.game = gam;
@@ -50,6 +52,8 @@ public class GameScreen implements Screen {
         invulnerable = false;
         invulnerabilityDuration = 6; // Duración de la invulnerabilidad en segundos
         invulnerabilityTimer = 0;
+        normalPowerUpSpawnRate = powerUpSpawnRate;
+        normalScoreIncrementRate = 1.0f;
         spawnPowerUp();
     }
 
@@ -125,7 +129,14 @@ public class GameScreen implements Screen {
             game.setScreen(new GameOverScreen(game));
             dispose();
         }
+        // Aumentar la tasa de incremento del score mientras el power-up está activo
+        if (player.hasPowerUp()) {
+            score += Gdx.graphics.getDeltaTime() * normalScoreIncrementRate * 2f; // Por ejemplo, el doble de rápido
+        } else {
+            score += Gdx.graphics.getDeltaTime() * normalScoreIncrementRate; // Restablecer el incremento normal
+        }
 
+        // Actualizar el temporizador de invulnerabilidad
         if (invulnerable) {
             invulnerabilityTimer += delta;
             if (invulnerabilityTimer >= invulnerabilityDuration) {
@@ -215,6 +226,13 @@ public class GameScreen implements Screen {
         powerUps.add(powerUp);
         stage.addActor(powerUp);
         lastPowerUpTime = TimeUtils.nanoTime();
+
+        // Reducir la tasa de aparición de power-ups mientras el power-up está activo
+        if (player.hasPowerUp()) {
+            powerUpSpawnRate = normalPowerUpSpawnRate / 2f; // Por ejemplo, la mitad del valor normal
+        } else {
+            powerUpSpawnRate = normalPowerUpSpawnRate; // Restablecer el valor normal
+        }
     }
 
     private void activateInvulnerability() {
