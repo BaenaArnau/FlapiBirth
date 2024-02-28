@@ -47,9 +47,9 @@ public class Player extends Actor {
 
         // Si el jugador tiene un power-up activo, usamos la textura del power-up, de lo contrario, usamos la textura base
         if (hasPowerUp) {
-            currentTextureRegion = new TextureRegion(powerUpTexture);
+            currentTextureRegion = powerUpTextureRegion;
         } else {
-            currentTextureRegion = new TextureRegion(baseTexture);
+            currentTextureRegion = baseTextureRegion;
         }
 
         batch.draw(currentTextureRegion, getX(), getY(), getWidth(), getHeight()); // Dibujamos la textura actual
@@ -80,15 +80,14 @@ public class Player extends Actor {
         return bounds;
     }
 
-    public void setPowerUpTexture(Texture texture) {
-        this.powerUpTexture = texture;
-        this.powerUpTextureRegion = new TextureRegion(texture, 0, 0, 64, 45);
+    public void setPowerUpTexture(TextureRegion textureRegion) {
+        this.powerUpTextureRegion = textureRegion;
     }
 
-    public void deactivatePowerUp(AssetManager manager) {
+    public void deactivatePowerUp() {
         this.hasPowerUp = false;
         // Restaurar la textura base
-        baseTexture = manager.get("bird.png", Texture.class);
-        baseTextureRegion.setRegion(baseTexture);
+        this.powerUpTextureRegion = null;
     }
+
 }

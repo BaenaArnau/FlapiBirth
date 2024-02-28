@@ -6,6 +6,7 @@ import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.Array;
@@ -21,18 +22,23 @@ public class GameScreen implements Screen {
     private Player player;
     private boolean dead;
     private Array<Pipe> obstacles;
-    private Array<PowerUp> powerUps;
+    private Array<StarUp> powerUps;
     private long lastObstacleTime;
     private long lastPowerUpTime;
     private float lastHoley;
     private float score;
-    private float powerUpSpawnRate; // Tasa de aparición del power-up
-    private boolean invulnerable; // Variable para controlar si el jugador está invulnerable
-    private float invulnerabilityDuration; // Duración de la invulnerabilidad en segundos
-    private float invulnerabilityTimer; // Temporizador para la invulnerabilidad
+    private float powerUpSpawnRate;
+    private boolean invulnerable;
+    private float invulnerabilityDuration;
+    private float invulnerabilityTimer;
     private SpriteBatch batch;
     private float normalPowerUpSpawnRate;
     private float normalScoreIncrementRate;
+    private Array<ScoreMultiplierPowerUp> scoreMultipliers;
+    private long lastScoreMultiplierTime;
+    private float scoreMultiplierSpawnRate;
+    private float normalScoreMultiplierSpawnRate;
+    private boolean recoger = true;
 
     public GameScreen(final Bird gam) {
         this.game = gam;
@@ -48,13 +54,16 @@ public class GameScreen implements Screen {
         stage.addActor(player);
         spawnObstacle();
         score = 0;
-        powerUpSpawnRate = 10; // Establecemos la tasa de aparición inicial del power-up
+        powerUpSpawnRate = 10;
         invulnerable = false;
-        invulnerabilityDuration = 6; // Duración de la invulnerabilidad en segundos
+        invulnerabilityDuration = 6;
         invulnerabilityTimer = 0;
         normalPowerUpSpawnRate = powerUpSpawnRate;
         normalScoreIncrementRate = 1.0f;
-        spawnPowerUp();
+        scoreMultipliers = new Array<>();
+        scoreMultiplierSpawnRate = 20;
+        normalScoreMultiplierSpawnRate = scoreMultiplierSpawnRate;
+        lastScoreMultiplierTime = TimeUtils.nanoTime();
     }
 
     @Override
@@ -87,6 +96,9 @@ public class GameScreen implements Screen {
         if (TimeUtils.nanoTime() - lastPowerUpTime > powerUpSpawnRate * 1000000000) {
             spawnPowerUp();
         }
+        if (TimeUtils.nanoTime() - lastScoreMultiplierTime > scoreMultiplierSpawnRate * 1000000000) {
+            spawnScoreMultiplier();
+        }
         Iterator<Pipe> iter = obstacles.iterator();
         while (iter.hasNext()) {
             Pipe pipe = iter.next();
@@ -104,22 +116,43 @@ public class GameScreen implements Screen {
             }
         }
         // Dentro del bucle while que maneja la recolección del power-up en el método render de GameScreen
-        Iterator<PowerUp> powerUpIterator = powerUps.iterator();
+        Iterator<StarUp> powerUpIterator = powerUps.iterator();
         while (powerUpIterator.hasNext()) {
-            PowerUp powerUp = powerUpIterator.next();
-            if (powerUp.getBounds().overlaps(player.getBounds())) {
-                powerUp.collect(); // Marcar el power-up como recogido
+            StarUp starUp = powerUpIterator.next();
+            if (starUp.getBounds().overlaps(player.getBounds())) {
+                starUp.collect(); // Marcar el power-up como recogido
                 activateInvulnerability(); // Activar la invulnerabilidad
                 player.setHasPowerUp(true); // Establecer que el jugador tiene un power-up activo
-                player.setPowerUpTexture(game.manager.get("powerupbird.png", Texture.class)); // Cambiar la textura del jugador
+                Texture powerUpTexture = game.manager.get("powerupbird.png", Texture.class);
+                TextureRegion powerUpTextureRegion = new TextureRegion(powerUpTexture);
+                player.setPowerUpTexture(powerUpTextureRegion);
             }
         }
+        Iterator<ScoreMultiplierPowerUp> scoreMultiplierPowerUpIterator = scoreMultipliers.iterator();
+        while (scoreMultiplierPowerUpIterator.hasNext()){
+            ScoreMultiplierPowerUp scoreMultiplierPowerUp = scoreMultiplierPowerUpIterator.next();
+            if (scoreMultiplierPowerUp.getBounds().overlaps(player.getBounds())){
+                scoreMultiplierPowerUp.collect();
+                if (recoger){
+                    score *= 2; // Multiplicar el contador actual por dos
+                    recoger = false;
+                }else {
+                    recoger = true;
+                }
+            }
+        }
+
+        checkScoreMultiplierCollision();
+
         // Actualizar el temporizador de invulnerabilidad
         if (invulnerable) {
             invulnerabilityTimer += delta;
             if (invulnerabilityTimer >= invulnerabilityDuration) {
                 invulnerable = false; // Desactivar la invulnerabilidad al pasar el tiempo
                 invulnerabilityTimer = 0; // Reiniciar el temporizador
+                player.deactivatePowerUp(); // Desactivar el power-up cuando se agote el tiempo
+                // Restaurar la textura del jugador a la normal
+                player.setPowerUpTexture(null);
             }
         }
         if (dead) {
@@ -131,7 +164,7 @@ public class GameScreen implements Screen {
         }
         // Aumentar la tasa de incremento del score mientras el power-up está activo
         if (player.hasPowerUp()) {
-            score += Gdx.graphics.getDeltaTime() * normalScoreIncrementRate * 2f; // Por ejemplo, el doble de rápido
+            score += Gdx.graphics.getDeltaTime() * normalScoreIncrementRate * 4f; // Por ejemplo, el doble de rápido
         } else {
             score += Gdx.graphics.getDeltaTime() * normalScoreIncrementRate; // Restablecer el incremento normal
         }
@@ -142,7 +175,9 @@ public class GameScreen implements Screen {
             if (invulnerabilityTimer >= invulnerabilityDuration) {
                 invulnerable = false; // Desactivar la invulnerabilidad al pasar el tiempo
                 invulnerabilityTimer = 0; // Reiniciar el temporizador
-                player.deactivatePowerUp(game.manager); // Desactivar el power-up cuando se agote el tiempo
+                player.deactivatePowerUp(); // Desactivar el power-up cuando se agote el tiempo
+                // Restaurar la textura del jugador a la normal
+                player.setPowerUpTexture(null);
             }
         }
     }
@@ -198,17 +233,17 @@ public class GameScreen implements Screen {
 
         // Calcular la posición Y del power-up para que esté en el espacio entre las tuberías
         float pipeTopY = lastHoley + gapHeight / 2f; // Posición Y de la parte superior de la tubería
-        float pipeBottomY = lastHoley - gapHeight / 2f - PowerUp.DEFAULT_HEIGHT; // Posición Y de la parte inferior de la tubería
+        float pipeBottomY = lastHoley - gapHeight / 2f - StarUp.DEFAULT_HEIGHT; // Posición Y de la parte inferior de la tubería
         float powerUpY = MathUtils.random(pipeBottomY, pipeTopY);
 
         // Verificar si la posición Y del power-up no colisiona con las tuberías
         for (Pipe pipe : obstacles) {
-            if (powerUpY < pipe.getY() + pipe.getHeight() && powerUpY + PowerUp.DEFAULT_HEIGHT > pipe.getY()) {
+            if (powerUpY < pipe.getY() + pipe.getHeight() && powerUpY + StarUp.DEFAULT_HEIGHT > pipe.getY()) {
                 // La posición Y del power-up colisiona con esta tubería, ajustar la posición Y del power-up
                 if (pipe.isUpsideDown()) {
                     powerUpY = pipe.getY() + pipe.getHeight();
                 } else {
-                    powerUpY = pipe.getY() - PowerUp.DEFAULT_HEIGHT;
+                    powerUpY = pipe.getY() - StarUp.DEFAULT_HEIGHT;
                 }
             }
         }
@@ -218,13 +253,13 @@ public class GameScreen implements Screen {
         float screenHeight = Gdx.graphics.getHeight();
 
         // Calcular la posición X del power-up para que esté en el centro de la pantalla
-        float powerUpX = (screenWidth - PowerUp.DEFAULT_WIDTH) / 2f;
+        float powerUpX = (screenWidth - StarUp.DEFAULT_WIDTH) / 2f;
 
         // Crear y agregar el power-up al juego
-        PowerUp powerUp = new PowerUp(powerUpX, powerUpY);
-        powerUp.setManager(game.manager);
-        powerUps.add(powerUp);
-        stage.addActor(powerUp);
+        StarUp starUp = new StarUp(powerUpX, powerUpY);
+        starUp.setManager(game.manager);
+        powerUps.add(starUp);
+        stage.addActor(starUp);
         lastPowerUpTime = TimeUtils.nanoTime();
 
         // Reducir la tasa de aparición de power-ups mientras el power-up está activo
@@ -239,4 +274,60 @@ public class GameScreen implements Screen {
         invulnerable = true;
         invulnerabilityTimer = 0; // Reiniciar el temporizador de invulnerabilidad
     }
+
+    private void spawnScoreMultiplier() {
+        // Calcular el espacio entre las tuberías
+        float gapHeight = 200; // Esto puede variar dependiendo del diseño de tu juego
+
+        // Calcular la posición Y del multiplicador de puntaje para que esté en el espacio entre las tuberías
+        float pipeTopY = lastHoley + gapHeight / 2f; // Posición Y de la parte superior de la tubería
+        float pipeBottomY = lastHoley - gapHeight / 2f - ScoreMultiplierPowerUp.DEFAULT_SIZE; // Posición Y de la parte inferior de la tubería
+        float scoreMultiplierY = MathUtils.random(pipeBottomY, pipeTopY);
+
+        // Verificar si la posición Y del multiplicador de puntaje no colisiona con las tuberías
+        for (Pipe pipe : obstacles) {
+            if (scoreMultiplierY < pipe.getY() + pipe.getHeight() && scoreMultiplierY + ScoreMultiplierPowerUp.DEFAULT_SIZE > pipe.getY()) {
+                // La posición Y del multiplicador de puntaje colisiona con esta tubería, ajustar la posición Y
+                if (pipe.isUpsideDown()) {
+                    scoreMultiplierY = pipe.getY() + pipe.getHeight();
+                } else {
+                    scoreMultiplierY = pipe.getY() - ScoreMultiplierPowerUp.DEFAULT_SIZE;
+                }
+            }
+        }
+
+        // Obtener las dimensiones de la pantalla
+        float screenWidth = Gdx.graphics.getWidth();
+        float screenHeight = Gdx.graphics.getHeight();
+
+        // Calcular la posición X del multiplicador de puntaje para que esté en el centro de la pantalla
+        float scoreMultiplierX = (screenWidth - ScoreMultiplierPowerUp.DEFAULT_SIZE) / 2f;
+
+        // Crear y agregar el multiplicador de puntaje al juego
+        ScoreMultiplierPowerUp scoreMultiplier = new ScoreMultiplierPowerUp(scoreMultiplierX, scoreMultiplierY);
+        scoreMultipliers.add(scoreMultiplier);
+        stage.addActor(scoreMultiplier);
+        lastScoreMultiplierTime = TimeUtils.nanoTime();
+
+        // Reducir aún más la tasa de aparición para que los multiplicadores de puntaje aparezcan más frecuentemente
+        scoreMultiplierSpawnRate = normalScoreMultiplierSpawnRate; // Por ejemplo, un cuarto del valor normal
+    }
+
+    private void checkScoreMultiplierCollision() {
+        Iterator<ScoreMultiplierPowerUp> iter = scoreMultipliers.iterator();
+        while (iter.hasNext()) {
+            ScoreMultiplierPowerUp scoreMultiplier = iter.next();
+            if (scoreMultiplier.getBounds().overlaps(player.getBounds())) {
+                scoreMultiplier.collect();
+                if (recoger){
+                    score *= 2; // Multiplicar el contador actual por dos
+                    recoger = false;
+                } else {
+                    recoger = true;
+                }
+                iter.remove(); // Eliminar el power-up después de ser recogido
+            }
+        }
+    }
+
 }

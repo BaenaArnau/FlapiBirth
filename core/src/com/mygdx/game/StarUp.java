@@ -6,14 +6,14 @@ import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 
-public class PowerUp extends Actor {
+public class StarUp extends Actor {
     static final float DEFAULT_WIDTH = 32; // Ancho de la imagen del power-up
     static final float DEFAULT_HEIGHT = 32; // Alto de la imagen del power-up
     private Rectangle bounds;
     private AssetManager manager;
     private boolean collected;
 
-    public PowerUp(float x, float y) {
+    public StarUp(float x, float y) {
         setX(x);
         setY(y);
         setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
